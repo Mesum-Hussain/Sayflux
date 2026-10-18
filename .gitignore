@@ -1,0 +1,18 @@
+*.swp
+*.un
+*~
+CLAUDE.md
+context.txt
+archive/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+.ruff_cache/
+
+# Personal scratch
+test
