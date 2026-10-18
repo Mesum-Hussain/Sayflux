@@ -10,12 +10,18 @@ DEFAULT_CONFIG = """\
 # Sayflux configuration
 
 [speech]
+# "redux" (169 MB download, default) or "parakeet-v3-int8" (490 MB, better with loud
+# background noise). Run `sayflux download` after changing it.
+model = "redux"
 threads = 0                  # CPU threads for the speech model; 0 = automatic
 silence_threshold_db = -50   # recordings quieter than this are skipped
 
 [format]
-# Clean up the transcript with Gemini before typing it.
-# Without an API key the raw transcript is typed instead.
+# Remove "um"/"uh", stutters like "the the", apply "scratch that" and "new line".
+# Runs on this computer with simple rules, before Gemini (if enabled).
+basic_cleanup = true
+# Then clean up the transcript with Gemini: self-corrections, lists, numbers, emails.
+# Without an API key only the basic clean-up is applied.
 enabled = true
 model = "gemini-3.1-flash-lite"
 api_key = ""                 # or set GEMINI_API_KEY in your environment or ~/.env

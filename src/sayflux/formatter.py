@@ -1,6 +1,7 @@
-"""Clean up a raw transcript with Gemini. Plain HTTPS, no SDK.
+"""Clean up a raw transcript: basic rules on this computer, then optionally Gemini.
 
-On any failure the raw transcript is returned, so dictation never gets lost.
+Gemini is called over plain HTTPS, no SDK. On any Gemini failure the rule-cleaned
+transcript is returned, so dictation never gets lost.
 """
 
 import json
@@ -8,6 +9,7 @@ import logging
 import urllib.error
 import urllib.request
 
+from sayflux import cleanup
 from sayflux.config import gemini_api_key
 
 log = logging.getLogger(__name__)
@@ -54,6 +56,8 @@ def _request(url: str, key: str, body: dict, timeout: float) -> dict:
 
 def format_text(text: str, cfg: dict) -> str:
     fmt = cfg["format"]
+    if fmt.get("basic_cleanup", True):
+        text = cleanup.clean(text)
     key = gemini_api_key(cfg)
     if not fmt.get("enabled", True) or not key or not text.strip():
         return text

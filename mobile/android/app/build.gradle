@@ -1,0 +1,197 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+/**
+ * This is the configuration block to customize your React Native Android app.
+ * By default you don't need to apply any configuration, just uncomment the lines you need.
+ */
+react {
+    /* Folders */
+    //   The root of your project, i.e. where "package.json" lives. Default is '../..'
+    // root = file("../../")
+    //   The folder where the react-native NPM package is. Default is ../../node_modules/react-native
+    // reactNativeDir = file("../../node_modules/react-native")
+    //   The folder where the react-native Codegen package is. Default is ../../node_modules/@react-native/codegen
+    // codegenDir = file("../../node_modules/@react-native/codegen")
+    //   The cli.js file which is the React Native CLI entrypoint. Default is ../../node_modules/react-native/cli.js
+    // cliFile = file("../../node_modules/react-native/cli.js")
+
+    /* Variants */
+    //   The list of variants to that are debuggable. For those we're going to
+    //   skip the bundling of the JS bundle and the assets. Default is "debug", "debugOptimized".
+    //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
+    // debuggableVariants = ["liteDebug", "liteDebugOptimized", "prodDebug", "prodDebugOptimized"]
+
+    /* Bundling */
+    //   A list containing the node command and its flags. Default is just 'node'.
+    // nodeExecutableAndArgs = ["node"]
+    //
+    //   The command to run when bundling. By default is 'bundle'
+    // bundleCommand = "ram-bundle"
+    //
+    //   The path to the CLI configuration file. Default is empty.
+    // bundleConfig = file(../rn-cli.config.js)
+    //
+    //   The name of the generated asset file containing your JS bundle
+    // bundleAssetName = "MyApplication.android.bundle"
+    //
+    //   The entry file for bundle generation. Default is 'index.android.js' or 'index.js'
+    // entryFile = file("../js/MyApplication.android.js")
+    //
+    //   A list of extra flags to pass to the 'bundle' commands.
+    //   See https://github.com/react-native-community/cli/blob/main/docs/commands.md#bundle
+    // extraPackagerArgs = []
+
+    /* Hermes Commands */
+    //   The hermes compiler command to run. By default it is 'hermesc'
+    // hermesCommand = "$rootDir/my-custom-hermesc/bin/hermesc"
+    //
+    //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
+    // hermesFlags = ["-O", "-output-source-map"]
+
+    /* Autolinking */
+    autolinkLibrariesWithApp()
+}
+
+/**
+ * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
+ */
+def enableProguardInReleaseBuilds = false
+
+/**
+ * The preferred build flavor of JavaScriptCore (JSC)
+ *
+ * For example, to use the international variant, you can use:
+ * `def jscFlavor = io.github.react-native-community:jsc-android-intl:2026004.+`
+ *
+ * The international variant includes ICU i18n library and necessary data
+ * allowing to use e.g. `Date.toLocaleString` and `String.localeCompare` that
+ * give correct results when using with locales other than en-US. Note that
+ * this variant is about 6MiB larger per architecture than default.
+ */
+def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace "app.sayflux"
+    defaultConfig {
+        applicationId "app.sayflux"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "0.1.0"
+        // Only package native code (React Native, sherpa-onnx) for the architectures we build.
+        ndk { abiFilters(*reactNativeArchitectures.split(",")) }
+    }
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            // Caution! In production, you need to generate your own keystore file.
+            // see https://reactnative.dev/docs/signed-apk-android.
+            signingConfig signingConfigs.debug
+            minifyEnabled enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+}
+
+// sherpa-onnx (runs the speech model). Its Android library is only published on GitHub,
+// so download it once into app/libs/ and check its SHA-256 before using it.
+def sherpaOnnxVersion = "1.13.8"
+def sherpaOnnxSha256 = "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96"
+def sherpaOnnxAar = file("libs/sherpa-onnx-${sherpaOnnxVersion}.aar")
+if (!sherpaOnnxAar.exists()) {
+    def url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v${sherpaOnnxVersion}/sherpa-onnx-${sherpaOnnxVersion}.aar"
+    logger.lifecycle("Downloading ${url}")
+    sherpaOnnxAar.parentFile.mkdirs()
+    def tmp = file("${sherpaOnnxAar.path}.part")
+    new URL(url).withInputStream { input -> tmp.withOutputStream { it << input } }
+    def digest = java.security.MessageDigest.getInstance("SHA-256").digest(tmp.bytes).encodeHex().toString()
+    if (digest != sherpaOnnxSha256) {
+        tmp.delete()
+        throw new GradleException("sherpa-onnx download has the wrong SHA-256: ${digest}")
+    }
+    tmp.renameTo(sherpaOnnxAar)
+}
+
+// The speech model ships inside the app (assets/models/<name>/), so it works right after
+// install with no download. Fetched once into app/build/, checked against its SHA-256.
+// Same model as the desktop app's default (src/sayflux/speech.py).
+def speechModelName = "sherpa-onnx-nemo-parakeet-redux"
+def speechModelUrl = "https://huggingface.co/Codyfederer/sherpa-onnx-nemo-parakeet-redux/resolve/main/${speechModelName}.tar.bz2"
+def speechModelSha256 = "4f1b06857fa85abab4d7fb14b644a6a98f2e241d92f9e5227f6719e0050417c4"
+def speechModelFiles = ["encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt"]
+def speechModelAssets = layout.buildDirectory.dir("generated/speechModel/assets").get().asFile
+
+def prepareSpeechModel = tasks.register("prepareSpeechModel") {
+    description = "Downloads the Parakeet Redux speech model and unpacks it into the app's assets."
+    def archive = file("${rootDir}/.speech-model/${speechModelName}.tar.bz2")
+    def outDir = new File(speechModelAssets, "models/${speechModelName}")
+    outputs.dir(speechModelAssets)
+    inputs.property("sha256", speechModelSha256)
+    doLast {
+        if (!archive.exists()) {
+            logger.lifecycle("Downloading ${speechModelUrl}")
+            archive.parentFile.mkdirs()
+            def tmp = file("${archive.path}.part")
+            new URL(speechModelUrl).withInputStream { input -> tmp.withOutputStream { it << input } }
+            tmp.renameTo(archive)
+        }
+        def md = java.security.MessageDigest.getInstance("SHA-256")
+        archive.withInputStream { input ->
+            byte[] buf = new byte[1 << 20]
+            int n
+            while ((n = input.read(buf)) > 0) md.update(buf, 0, n)
+        }
+        def digest = md.digest().encodeHex().toString()
+        if (digest != speechModelSha256) {
+            archive.delete()
+            throw new GradleException("Speech model download has the wrong SHA-256: ${digest}")
+        }
+        delete(speechModelAssets)
+        def staging = file("${temporaryDir}/unpacked")
+        delete(staging)
+        ant.untar(src: archive, dest: staging, compression: "bzip2")
+        outDir.mkdirs()
+        speechModelFiles.each { name ->
+            def f = new File(staging, "${speechModelName}/${name}")
+            if (!f.exists()) throw new GradleException("Speech model archive is missing ${name}")
+            f.renameTo(new File(outDir, name))
+        }
+        delete(staging)
+    }
+}
+
+android.sourceSets.main.assets.srcDir(speechModelAssets)
+// Keep the model uncompressed in the APK so it can be read directly, without unpacking.
+android.androidResources.noCompress += ["onnx"]
+tasks.named("preBuild") { dependsOn(prepareSpeechModel) }
+
+dependencies {
+    // The version of react-native is set by the React Native Gradle Plugin
+    implementation("com.facebook.react:react-android")
+    implementation(files(sherpaOnnxAar))
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20260814") // Android's own org.json is a stub in unit tests
+
+    if (hermesEnabled.toBoolean()) {
+        implementation("com.facebook.react:hermes-android")
+    } else {
+        implementation jscFlavor
+    }
+}

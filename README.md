@@ -3,19 +3,23 @@
 Dictate anywhere on Linux, macOS and Windows. Press a shortcut, talk, press it again, and
 clean text is typed at your cursor.
 
-- **Local speech-to-text** with NVIDIA Parakeet TDT 0.6B v3 (int8 ONNX, ~490 MB download).
-  Your audio never leaves your computer. 25 European languages, with punctuation and capitals.
-- **Formatting** with Gemini (`gemini-3.1-flash-lite` by default): removes "um"s and false
-  starts, applies corrections like "Tuesday, no, Wednesday", turns spoken lists into lists,
-  and writes numbers, emails and dates properly. Only the text is sent, never the audio.
-  Without an API key, or if Gemini fails, the raw transcript is typed instead.
+- **Local speech-to-text** with Parakeet Redux, a compressed NVIDIA Parakeet TDT 0.6B v3
+  (169 MB download). Your audio never leaves your computer. 25 European languages, with
+  punctuation and capitals.
+- **Basic clean-up on your computer**: removes "um"/"uh" and stutters like "the the",
+  applies "scratch that", and turns "new line" and "new paragraph" into line breaks.
+- **Optional smart clean-up** with Gemini (`gemini-3.1-flash-lite` by default): applies
+  corrections like "Tuesday, no, Wednesday", turns spoken lists into lists, and writes
+  numbers, emails and dates properly. Only the text is sent, never the audio. Without an
+  API key, or if Gemini fails, the basic clean-up is typed instead.
 - **Small**: three Python dependencies on macOS and Windows (`sherpa-onnx`, `sounddevice`,
   `pynput`) and two on Linux.
 
 ## How it works
 
 ```
-shortcut ─▶ record mic ─▶ shortcut ─▶ Parakeet (local) ─▶ Gemini cleanup ─▶ typed at cursor
+shortcut ─▶ record mic ─▶ shortcut ─▶ Parakeet (local) ─▶ basic clean-up (local)
+                                                    ─▶ Gemini (optional) ─▶ typed at cursor
 ```
 
 A background process keeps the model loaded, so after the first run each dictation takes
@@ -32,7 +36,7 @@ You need Python 3.11+ and [uv](https://docs.astral.sh/uv/) (or pipx).
 ```sh
 git clone <this repo> sayflux && cd sayflux
 uv tool install .
-sayflux download        # fetch the speech model once (~490 MB)
+sayflux download        # fetch the speech model once (169 MB)
 ```
 
 Then add your Gemini API key (free at [aistudio.google.com](https://aistudio.google.com/apikey))
@@ -144,11 +148,13 @@ The most useful settings:
 
 ```toml
 [format]
+basic_cleanup = true              # remove "um"s and stutters, apply "scratch that"
+enabled = true                    # false = don't send the text to Gemini
 model = "gemini-3.1-flash-lite"   # any Gemini model that supports generateContent
 instructions = "Spell these as written: Kubernetes, PostgreSQL, Sayflux."
-enabled = true                    # false = type the raw transcript
 
 [speech]
+model = "redux"                   # or "parakeet-v3-int8": 490 MB, better in loud noise
 silence_threshold_db = -50        # recordings quieter than this are skipped
 
 [output]
@@ -167,13 +173,15 @@ sounds = true
 
 ## Mobile
 
-Android and iOS need their own apps: to type into other apps, Sayflux has to be a custom
-keyboard (Kotlin on Android, Swift on iOS). The same Parakeet model files run there through
-sherpa-onnx, and the same Gemini prompt can be reused. On iOS, keyboards can't use the
-microphone and have tight memory limits, so recording would happen in the main app.
+The Android app is in [`mobile/`](mobile/README.md): a voice keyboard that runs the same
+Parakeet model on the phone and uses the same Gemini prompt. iOS is not started yet; iOS
+keyboards can't use the microphone and have tight memory limits, so recording would have
+to happen in the main app.
 
 ## Credits
 
-Speech model by
-NVIDIA ([Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), CC-BY-4.0),
-run with [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx).
+Speech model: [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) by
+NVIDIA, compressed as [Parakeet Redux](https://huggingface.co/moondream/parakeet-redux) by
+Moondream, exported to ONNX by [eschmidbauer](https://huggingface.co/eschmidbauer/parakeet-redux-onnx)
+and packaged for sherpa-onnx by [Codyfederer](https://huggingface.co/Codyfederer/sherpa-onnx-nemo-parakeet-redux)
+(all CC-BY-4.0). Run with [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx).

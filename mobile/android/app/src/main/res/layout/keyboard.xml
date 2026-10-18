@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keyboards inflate plain framework views (not AppCompat), so android:tint is the right attribute. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/kb_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/kb_bg"
+    android:orientation="vertical"
+    android:paddingStart="6dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="6dp"
+    android:paddingBottom="6dp"
+    tools:ignore="UseAppTint,Overdraw">
+
+    <TextView
+        android:id="@+id/kb_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:maxLines="2"
+        android:minHeight="40dp"
+        android:paddingHorizontal="16dp"
+        android:text="@string/kb_tap_to_speak"
+        android:textColor="@color/kb_text"
+        android:textSize="15sp" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="132dp">
+
+        <View
+            android:id="@+id/kb_ring"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_gravity="center"
+            android:alpha="0"
+            android:background="@drawable/kb_ring" />
+
+        <FrameLayout
+            android:id="@+id/kb_mic"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_gravity="center"
+            android:background="@drawable/kb_mic_bg"
+            android:clickable="true"
+            android:contentDescription="@string/kb_mic"
+            android:focusable="true"
+            android:elevation="2dp">
+
+            <ImageView
+                android:id="@+id/kb_mic_icon"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_mic"
+                android:tint="@color/kb_on_accent" />
+
+            <ProgressBar
+                android:id="@+id/kb_busy"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_gravity="center"
+                android:indeterminateTint="@color/kb_on_accent"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <ImageView
+            android:id="@+id/kb_cancel"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_gravity="center_vertical|start"
+            android:layout_marginStart="24dp"
+            android:background="@drawable/kb_key_bg"
+            android:contentDescription="@string/kb_cancel"
+            android:padding="14dp"
+            android:src="@drawable/ic_close"
+            android:tint="@color/kb_icon"
+            android:visibility="invisible" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/kb_switch"
+            style="@style/KbKey"
+            android:layout_width="0dp"
+            android:layout_weight="1.3"
+            android:contentDescription="@string/kb_switch"
+            android:src="@drawable/ic_keyboard" />
+
+        <TextView
+            android:id="@+id/kb_space"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginHorizontal="3dp"
+            android:layout_weight="5"
+            android:background="@drawable/kb_key_bg"
+            android:contentDescription="@string/kb_space"
+            android:gravity="center"
+            android:text="@string/app_name"
+            android:textColor="@color/kb_text"
+            android:textSize="14sp" />
+
+        <ImageView
+            android:id="@+id/kb_backspace"
+            style="@style/KbKey"
+            android:layout_width="0dp"
+            android:layout_weight="1.3"
+            android:contentDescription="@string/kb_backspace"
+            android:src="@drawable/ic_backspace" />
+
+        <ImageView
+            android:id="@+id/kb_enter"
+            style="@style/KbKey"
+            android:layout_width="0dp"
+            android:layout_weight="1.3"
+            android:contentDescription="@string/kb_enter"
+            android:src="@drawable/ic_enter" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,97 @@
+{
+  "_note": "Expected output of the rule-based clean-up. Used by tests/test_cleanup.py (desktop) and CleanupTest.kt (Android).",
+  "cases": [
+    {
+      "in": "Um so I was thinking that we could uh meet on Tuesday, no, Wednesday at like three PM.",
+      "out": "So I was thinking that we could meet on Tuesday, no, Wednesday at like three PM."
+    },
+    {
+      "in": "Can you send me the report by tomorrow?",
+      "out": "Can you send me the report by tomorrow?"
+    },
+    {
+      "in": "What is the capital of France?",
+      "out": "What is the capital of France?"
+    },
+    {
+      "in": "I need to buy milk, eggs, bread and uh coffee.",
+      "out": "I need to buy milk, eggs, bread and coffee."
+    },
+    {
+      "in": "Hey John, the the meeting is moved to five thirty. Scratch that. The meeting is cancelled.",
+      "out": "The meeting is cancelled."
+    },
+    {
+      "in": "My email is john at gmail dot com and the ticket costs twenty five dollars.",
+      "out": "My email is john at gmail dot com and the ticket costs twenty five dollars."
+    },
+    {
+      "in": "Okay so basically I think I think the new design is is really good but you know the colors are a bit too bright new paragraph also can we ship it on Friday",
+      "out": "Okay so basically I think the new design is really good but you know the colors are a bit too bright\n\nAlso can we ship it on Friday"
+    },
+    {
+      "in": "Mujhe kal office jaana hai, uh, but I will be late.",
+      "out": "Mujhe kal office jaana hai, but I will be late."
+    },
+    {
+      "in": "Uh, I, I think we should go.",
+      "out": "I think we should go."
+    },
+    {
+      "in": "We launched a new line of products. New line. Thanks everyone.",
+      "out": "We launched a new line of products.\nThanks everyone."
+    },
+    {
+      "in": "No, no, that is not what I meant.",
+      "out": "No, no, that is not what I meant."
+    },
+    {
+      "in": "I know that that is true and I had had enough.",
+      "out": "I know that that is true and I had had enough."
+    },
+    {
+      "in": "Let us meet at six. Scratch that, make it seven.",
+      "out": "Make it seven."
+    },
+    {
+      "in": "scratch that hello there",
+      "out": "Hello there"
+    },
+    {
+      "in": "Yes. Yes. Absolutely.",
+      "out": "Yes. Yes. Absolutely."
+    },
+    {
+      "in": "Dear team, new line, the build is green new line thanks",
+      "out": "Dear team\nThe build is green\nThanks"
+    },
+    {
+      "in": "It was very very good, bye bye.",
+      "out": "It was very very good, bye bye."
+    },
+    {
+      "in": "Ummm, hmm, okay.",
+      "out": "Okay."
+    },
+    {
+      "in": "Hello , uh. How are you?",
+      "out": "Hello. How are you?"
+    },
+    {
+      "in": "The the the cat sat.",
+      "out": "The cat sat."
+    },
+    {
+      "in": "So um, new paragraph, um, okay.",
+      "out": "So\n\nOkay."
+    },
+    {
+      "in": "Um.",
+      "out": ""
+    },
+    {
+      "in": "",
+      "out": ""
+    }
+  ]
+}

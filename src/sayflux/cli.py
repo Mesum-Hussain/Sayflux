@@ -74,7 +74,7 @@ def _setup_logging(to_file: bool) -> None:
 def cmd_toggle(args) -> int:
     reply = _send("toggle")
     if reply is None:
-        if not speech.is_downloaded():
+        if not speech.is_downloaded(speech.get_model(config.load())):
             print("The speech model isn't downloaded yet. Run: sayflux download", file=sys.stderr)
             return 1
         proc = _spawn_daemon()
@@ -121,10 +121,11 @@ def cmd_daemon(args) -> int:
 
 
 def cmd_download(args) -> int:
-    if speech.is_downloaded() and not args.force:
-        print(f"Already downloaded: {speech.model_dir()}")
+    model = speech.get_model(config.load())
+    if speech.is_downloaded(model) and not args.force:
+        print(f"Already downloaded: {speech.model_dir(model)}")
         return 0
-    print(f"Saved to: {speech.download()}")
+    print(f"Saved to: {speech.download(model)}")
     return 0
 
 
@@ -134,7 +135,7 @@ def cmd_transcribe(args) -> int:
 
     cfg = config.load()
     pcm, rate = audio.read_wav(Path(args.file))
-    raw = speech.Transcriber(cfg["speech"].get("threads", 0)).transcribe(pcm, rate)
+    raw = speech.Transcriber(speech.get_model(cfg), cfg["speech"].get("threads", 0)).transcribe(pcm, rate)
     if args.raw:
         print(raw)
         return 0
@@ -170,12 +171,12 @@ def main() -> None:
     sub.add_parser("status", help="show whether it's idle, recording or processing").set_defaults(func=cmd_simple)
     sub.add_parser("stop", help="stop the background process").set_defaults(func=cmd_stop)
     sub.add_parser("daemon", help="run the background process in the foreground").set_defaults(func=cmd_daemon)
-    p = sub.add_parser("download", help="download the speech model (~490 MB)")
+    p = sub.add_parser("download", help="download the speech model (169 MB)")
     p.add_argument("--force", action="store_true", help="download again even if present")
     p.set_defaults(func=cmd_download)
     p = sub.add_parser("transcribe", help="transcribe a 16-bit WAV file and print the text")
     p.add_argument("file")
-    p.add_argument("--raw", action="store_true", help="skip Gemini formatting")
+    p.add_argument("--raw", action="store_true", help="print the transcript without any clean-up")
     p.set_defaults(func=cmd_transcribe)
     sub.add_parser("config", help="create the config file if needed and print its path").set_defaults(func=cmd_config)
     p = sub.add_parser("log", help="show the end of the log")

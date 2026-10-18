@@ -1,0 +1,10 @@
+<resources>
+    <color name="kb_bg">#16161C</color>
+    <color name="kb_key">#2A2A34</color>
+    <color name="kb_key_pressed">#3A3A47</color>
+    <color name="kb_icon">#EDEDF2</color>
+    <color name="kb_text">#B4B4C2</color>
+    <color name="kb_accent">#8B8BF5</color>
+    <color name="kb_on_accent">#0F0F14</color>
+    <color name="kb_recording">#F2555A</color>
+</resources>

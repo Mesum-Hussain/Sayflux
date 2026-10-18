@@ -15,7 +15,7 @@ from sayflux import audio, paths
 from sayflux.formatter import format_text
 from sayflux.output import make_typer
 from sayflux.overlay import OverlayClient
-from sayflux.speech import Transcriber
+from sayflux.speech import Transcriber, get_model
 
 log = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class Daemon:
         self.state = "idle"  # idle -> recording -> processing -> idle
         self._lock = threading.Lock()
         start = time.monotonic()
-        self.transcriber = Transcriber(cfg["speech"].get("threads", 0))
+        self.transcriber = Transcriber(get_model(cfg), cfg["speech"].get("threads", 0))
         log.info("Speech model loaded in %.1fs", time.monotonic() - start)
         self.typer = make_typer(cfg)
         self.recorder = audio.Recorder()

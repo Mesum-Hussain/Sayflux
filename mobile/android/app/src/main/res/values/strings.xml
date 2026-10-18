@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Sayflux</string>
+    <string name="keyboard_name">Sayflux voice keyboard</string>
+    <string name="kb_tap_to_speak">Tap to speak</string>
+    <string name="kb_listening">Listening… tap to finish</string>
+    <string name="kb_loading">Loading speech model…</string>
+    <string name="kb_transcribing">Transcribing…</string>
+    <string name="kb_formatting">Cleaning up…</string>
+    <string name="kb_need_mic">Open Sayflux to allow the microphone</string>
+    <string name="kb_need_model">Open Sayflux to download the speech model</string>
+    <string name="kb_mic">Start or stop dictation</string>
+    <string name="kb_cancel">Cancel dictation</string>
+    <string name="kb_switch">Switch keyboard</string>
+    <string name="kb_space">Space</string>
+    <string name="kb_backspace">Delete</string>
+    <string name="kb_enter">Enter</string>
+</resources>
