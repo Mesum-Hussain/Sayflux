@@ -7,6 +7,7 @@ import android.provider.Settings as AndroidSettings
 import android.view.inputmethod.InputMethodManager
 import app.whistleflux.engine.ModelManager
 import app.whistleflux.engine.Settings
+import app.whistleflux.ime.Learning
 import app.whistleflux.specs.NativeWhistlefluxSpec
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -85,6 +86,10 @@ class WhistlefluxModule(private val context: ReactApplicationContext) : NativeWh
                 instructions = settings.getString("instructions").orEmpty(),
             ),
         )
+    }
+
+    override fun forgetLearnedWords() {
+        Learning.forget(context)
     }
 
     override fun openKeyboardSettings() {

@@ -1,11 +1,13 @@
 # Whistleflux for Android
 
-A Gboard-style keyboard (tap or swipe typing, word suggestions, a space bar that turns the
-keyboard into a trackpad) with a mic key: tap it, speak, tap the pill, and your words are
-typed into whatever app you're in. Speech is recognized on the phone with Cactus Whistle
-(17 MB), the same model as the desktop app, which ships inside the app (no download after
-installing). The text then gets the same basic clean-up as on desktop, and optionally
-Gemini's smart clean-up (only the text is sent, never audio).
+A voice keyboard that opens on a big mic: tap it, speak, tap the pill, and your words are
+typed into whatever app you're in. The keyboard button switches to a Gboard-style QWERTY
+(swipe typing, suggestions that learn on the phone, symbols, emoji with search, clipboard).
+
+Speech is recognized on the phone with Cactus Whistle (17 MB), the same model as the
+desktop app, which ships inside the app (no download after installing). The text then gets
+the same basic clean-up as on desktop, and optionally Gemini's smart clean-up (only the
+text is sent, never audio).
 
 The setup screen is React Native. The keyboard, recording, speech model and clean-up are
 native Kotlin, because Android keyboards must be native services.
@@ -17,7 +19,7 @@ android/app/src/main/java/app/whistleflux/
   ime/WhistlefluxKeyboard.kt   the keyboard service: typing, suggestions, voice
   ime/KeyboardView.kt          draws the keyboard and turns touches into keys, swipes,
                                trackpad moves; the mic key grows into the voice pill
-  ime/Layouts.kt               QWERTY, symbols and number pad
+  ime/Layouts.kt               mic view, QWERTY, symbols and number pad
   ime/Dictionary.kt            English word list (AOSP, Apache 2.0) for suggestions
   ime/GestureDecoder.kt        swipe typing: matches the swipe's path to words
   ime/PillRenderer.kt          the voice pill (same look as the desktop's)

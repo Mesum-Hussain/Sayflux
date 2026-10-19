@@ -228,6 +228,52 @@ def prepareDictionary = tasks.register("prepareDictionary") {
 
 android.sourceSets.main.assets.srcDir(dictionaryAssets)
 tasks.named("preBuild") { dependsOn(prepareDictionary) }
+
+// Emoji for the keyboard's emoji panel and search: Unicode's emoji-test.txt (names) and
+// CLDR's English annotations (keywords like "happy" for 😀), both Unicode license, pinned
+// by version and SHA-256. Kept: fully-qualified emoji in their base form (no skin-tone
+// variants), in Unicode's order. Written as "group<TAB>emoji<TAB>name<TAB>keywords" lines.
+def emojiUrl = "https://unicode.org/Public/emoji/15.1/emoji-test.txt"
+def emojiSha256 = "d876ee249aa28eaa76cfa6dfaa702847a8d13b062aa488d465d0395ee8137ed9"
+def emojiKeywordsUrl = "https://raw.githubusercontent.com/unicode-org/cldr-json/46.1.0/cldr-json/cldr-annotations-full/annotations/en/annotations.json"
+def emojiKeywordsSha256 = "2405d3f2e4c5812a4faf93d965630246269e0177ce907d863c7d6bb197e957c1"
+def emojiAssets = layout.buildDirectory.dir("generated/emoji/assets").get().asFile
+
+def prepareEmoji = tasks.register("prepareEmoji") {
+    description = "Downloads Unicode's emoji list and writes the keyboard's emoji file."
+    def cached = file("${rootDir}/.speech-model/emoji-test-15.1-${emojiSha256.take(12)}.txt")
+    def cachedKeywords = file("${rootDir}/.speech-model/emoji-annotations-46.1-${emojiKeywordsSha256.take(12)}.json")
+    outputs.dir(emojiAssets)
+    inputs.property("sha256", emojiSha256 + emojiKeywordsSha256)
+    doLast {
+        fetchVerified(emojiUrl, emojiSha256, cached)
+        fetchVerified(emojiKeywordsUrl, emojiKeywordsSha256, cachedKeywords)
+        def annotations = new groovy.json.JsonSlurper().parse(cachedKeywords, "UTF-8").annotations.annotations
+        def group = null
+        def lines = []
+        cached.eachLine("UTF-8") { s ->
+            if (s.startsWith("# group: ")) { group = s.substring(9).trim(); return }
+            if (s.startsWith("#") || !s.contains("; fully-qualified") || group == "Component") return
+            def codes = s.substring(0, s.indexOf(";")).trim().split(" ").collect { Integer.parseInt(it, 16) }
+            if (codes.any { it >= 0x1F3FB && it <= 0x1F3FF }) return // skin-tone variant
+            def emoji = new String(codes as int[], 0, codes.size())
+            // "# 😀 E1.0 grinning face": the name follows the version.
+            def name = s.substring(s.indexOf("#") + 1).trim().replaceFirst(/^\S+\s+E\d+\.\d+\s+/, "")
+            // CLDR keys usually lack the U+FE0F variation selector that emoji-test includes.
+            def ann = annotations[emoji] ?: annotations[emoji.replace("\uFE0F", "")]
+            def keywords = (ann?.default ?: []).collect { it.toLowerCase() }.join(" ")
+            lines << "${group}\t${emoji}\t${name}\t${keywords}"
+        }
+        delete(emojiAssets)
+        def out = new File(emojiAssets, "emoji/emoji.txt")
+        out.parentFile.mkdirs()
+        out.setText(lines.join("\n") + "\n", "UTF-8")
+        logger.lifecycle("Wrote ${lines.size()} emoji to ${out}")
+    }
+}
+
+android.sourceSets.main.assets.srcDir(emojiAssets)
+tasks.named("preBuild") { dependsOn(prepareEmoji) }
 // GestureDecoderTest reads the generated word file.
 tasks.withType(Test).configureEach { dependsOn(prepareDictionary) }
 

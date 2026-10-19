@@ -28,6 +28,8 @@ export interface Spec extends TurboModule {
   getSettings(): Settings;
   getModels(): Array<ModelOption>;
   saveSettings(settings: Settings): void;
+  /** Deletes what the keyboard learned from your typing (kept only on this phone). */
+  forgetLearnedWords(): void;
   openKeyboardSettings(): void;
   showKeyboardPicker(): void;
 }

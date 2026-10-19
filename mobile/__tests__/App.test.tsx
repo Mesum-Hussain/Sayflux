@@ -37,6 +37,7 @@ jest.mock('../specs/NativeWhistleflux', () => ({
       { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', note: 'Stronger' },
     ],
     saveSettings: jest.fn(),
+    forgetLearnedWords: jest.fn(),
     openKeyboardSettings: jest.fn(),
     showKeyboardPicker: jest.fn(),
   },

@@ -10,6 +10,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
   AppState,
   Image,
   Linking,
@@ -188,7 +189,7 @@ function SetupScreen({ c }: { c: Palette }) {
         done={status.keyboardSelected}
         active={current === 2}
         title="Switch to Whistleflux"
-        body="Pick Whistleflux as your keyboard. Type or swipe as usual, and tap the mic at the top right to speak."
+        body="Pick Whistleflux as your keyboard. It opens on the mic: tap it and speak. The keyboard button switches to typing, with swipe typing and suggestions."
       >
         <Button
           c={c}
@@ -199,6 +200,7 @@ function SetupScreen({ c }: { c: Palette }) {
 
       <TryIt c={c} />
       <CleanupSettings c={c} />
+      <TypingSettings c={c} />
     </ScrollView>
   );
 }
@@ -254,8 +256,8 @@ function TryIt({ c }: { c: Palette }) {
     <View style={s.card}>
       <Text style={s.sectionTitle}>Try it</Text>
       <Text style={s.body}>
-        Tap the box, then tap the mic at the top right of the keyboard. Tap the
-        pill when you're done speaking, or anywhere else to cancel.
+        Tap the box, then tap the mic and speak. Tap the pill when you're done
+        speaking, or anywhere else to cancel.
       </Text>
       <TextInput
         style={[s.input, s.multiline]}
@@ -371,6 +373,34 @@ function CleanupSettings({ c }: { c: Palette }) {
         disabled={saved}
         onPress={save}
       />
+    </View>
+  );
+}
+
+function TypingSettings({ c }: { c: Palette }) {
+  const s = makeStyles(c);
+  const forget = () =>
+    Alert.alert(
+      'Forget learned words?',
+      'The keyboard forgets the words you type and the words you usually type next.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Forget',
+          style: 'destructive',
+          onPress: () => Whistleflux.forgetLearnedWords(),
+        },
+      ],
+    );
+  return (
+    <View style={s.card}>
+      <Text style={s.sectionTitle}>Typing</Text>
+      <Text style={s.body}>
+        The keyboard learns the words you type, and which word you usually type
+        next, to suggest them. This stays on your phone. Nothing is learned in
+        password fields.
+      </Text>
+      <Button c={c} label="Forget learned words" onPress={forget} />
     </View>
   );
 }

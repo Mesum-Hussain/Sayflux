@@ -10,15 +10,18 @@ import kotlin.math.max
  * ideal path (straight lines through its key centers) and compares it with the swipe:
  * - location: how far apart the two paths are, point by point, in key widths,
  * - shape: the same after moving both to the origin and scaling them to the same size,
- * plus a penalty for rare words. Words with a key the swipe never came near are skipped.
+ * plus a penalty for rare words (your own usage counts, see [Learning]). Words with a key
+ * the swipe never came near are skipped.
  * The lowest total wins. Pure Kotlin, so it is tested on the computer (GestureDecoderTest).
  */
-class GestureDecoder(private val dictionary: Dictionary) {
+object GestureDecoder {
     /**
-     * xs, ys: the swipe's points, in the same coordinates as [centers] (letter -> x, y).
-     * Returns up to [limit] words, best first.
+     * xs, ys: the swipe's points, in the same coordinates as [centers] (key id -> x, y, with
+     * the ids [index] uses). Returns up to [limit] words, best first.
      */
-    fun decode(xs: FloatArray, ys: FloatArray, centers: Map<Char, FloatArray>, keyWidth: Float, limit: Int = 4): List<String> {
+    fun decode(
+        xs: FloatArray, ys: FloatArray, index: Dictionary.SwipeIndex, centers: Map<Char, FloatArray>, keyWidth: Float, limit: Int = 4,
+    ): List<String> {
         if (xs.size < 2 || pathLength(xs, ys) < keyWidth * 0.5f) return emptyList()
         val (px, py) = resample(xs, ys, POINTS)
 
@@ -30,14 +33,16 @@ class GestureDecoder(private val dictionary: Dictionary) {
         val ix = FloatArray(POINTS)
         val iy = FloatArray(POINTS)
         for (f in firsts) for (l in lasts) {
-            for (word in dictionary.swipeCandidates(f, l)) {
-                if (!passesNear(word.keys, px, py, centers, keyWidth * PASS_RADIUS)) continue
-                idealPath(word.keys, centers, ix, iy)
+            for (entry in index.candidates(f, l)) {
+                val word = entry.word
+                if (word.score <= 0) continue
+                if (!passesNear(entry.keys, px, py, centers, keyWidth * PASS_RADIUS)) continue
+                idealPath(entry.keys, centers, ix, iy)
                 var loc = 0f
                 for (i in 0 until POINTS) loc += hypot(px[i] - ix[i], py[i] - iy[i])
                 loc /= POINTS * keyWidth
                 val shape = shapeDistance(userShape, normalized(ix, iy, keyWidth))
-                val rarity = (MAX_FREQ - minOf(word.freq, MAX_FREQ)).toFloat() / MAX_FREQ
+                val rarity = (MAX_FREQ - minOf(word.score, MAX_FREQ)).toFloat() / MAX_FREQ
                 scored += word to (loc + SHAPE_WEIGHT * shape + RARITY_WEIGHT * rarity)
             }
         }
@@ -97,46 +102,44 @@ class GestureDecoder(private val dictionary: Dictionary) {
         return d / a.first.size
     }
 
-    companion object {
-        const val POINTS = 48
-        private const val END_RADIUS = 1.1f // key widths from a swipe end to its first/last key
-        private const val PASS_RADIUS = 1.0f // how close the swipe must come to every key
-        private const val SHAPE_WEIGHT = 1.5f
-        private const val RARITY_WEIGHT = 0.6f
-        private const val MAX_FREQ = 230
+    const val POINTS = 48
+    private const val END_RADIUS = 1.1f // key widths from a swipe end to its first/last key
+    private const val PASS_RADIUS = 1.0f // how close the swipe must come to every key
+    private const val SHAPE_WEIGHT = 1.5f
+    private const val RARITY_WEIGHT = 0.6f
+    private const val MAX_FREQ = 230
 
-        fun pathLength(xs: FloatArray, ys: FloatArray): Float {
-            var len = 0f
-            for (i in 1 until xs.size) len += hypot(xs[i] - xs[i - 1], ys[i] - ys[i - 1])
-            return len
-        }
+    fun pathLength(xs: FloatArray, ys: FloatArray): Float {
+        var len = 0f
+        for (i in 1 until xs.size) len += hypot(xs[i] - xs[i - 1], ys[i] - ys[i - 1])
+        return len
+    }
 
-        /** [n] points spaced evenly along the path (all at the start if it has no length). */
-        fun resample(xs: FloatArray, ys: FloatArray, n: Int): Pair<FloatArray, FloatArray> {
-            val outX = FloatArray(n)
-            val outY = FloatArray(n)
-            val total = pathLength(xs, ys)
-            if (xs.size == 1 || total == 0f) {
-                outX.fill(xs[0])
-                outY.fill(ys[0])
-                return outX to outY
-            }
-            val step = total / (n - 1)
-            var seg = 1
-            var segStart = 0f // distance along the path where segment [seg-1, seg] starts
-            var segLen = hypot(xs[1] - xs[0], ys[1] - ys[0])
-            for (i in 0 until n) {
-                val target = minOf(i * step, total)
-                while (seg < xs.size - 1 && segStart + segLen < target) {
-                    segStart += segLen
-                    seg++
-                    segLen = hypot(xs[seg] - xs[seg - 1], ys[seg] - ys[seg - 1])
-                }
-                val t = if (segLen > 0f) ((target - segStart) / segLen).coerceIn(0f, 1f) else 0f
-                outX[i] = xs[seg - 1] + (xs[seg] - xs[seg - 1]) * t
-                outY[i] = ys[seg - 1] + (ys[seg] - ys[seg - 1]) * t
-            }
+    /** [n] points spaced evenly along the path (all at the start if it has no length). */
+    fun resample(xs: FloatArray, ys: FloatArray, n: Int): Pair<FloatArray, FloatArray> {
+        val outX = FloatArray(n)
+        val outY = FloatArray(n)
+        val total = pathLength(xs, ys)
+        if (xs.size == 1 || total == 0f) {
+            outX.fill(xs[0])
+            outY.fill(ys[0])
             return outX to outY
         }
+        val step = total / (n - 1)
+        var seg = 1
+        var segStart = 0f // distance along the path where segment [seg-1, seg] starts
+        var segLen = hypot(xs[1] - xs[0], ys[1] - ys[0])
+        for (i in 0 until n) {
+            val target = minOf(i * step, total)
+            while (seg < xs.size - 1 && segStart + segLen < target) {
+                segStart += segLen
+                seg++
+                segLen = hypot(xs[seg] - xs[seg - 1], ys[seg] - ys[seg - 1])
+            }
+            val t = if (segLen > 0f) ((target - segStart) / segLen).coerceIn(0f, 1f) else 0f
+            outX[i] = xs[seg - 1] + (xs[seg] - xs[seg - 1]) * t
+            outY[i] = ys[seg - 1] + (ys[seg] - ys[seg - 1]) * t
+        }
+        return outX to outY
     }
 }

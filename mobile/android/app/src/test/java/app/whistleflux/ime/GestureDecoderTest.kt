@@ -6,23 +6,25 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Simulated swipes over a phone-sized QWERTY layout, decoded with the real word list. */
+/** Simulated swipes over phone-sized layouts, decoded with the real word list. */
 class GestureDecoderTest {
     // Unit tests run from mobile/android/app; the build generates this file first.
     private val dictionary = File("build/generated/dictionary/assets/${Dictionary.ASSET}")
         .bufferedReader().useLines { Dictionary.parse(it) }
-    private val decoder = GestureDecoder(dictionary)
 
-    // 1080 px wide, four 54 dp rows at 3x density, like a typical phone.
-    private val layout = Layouts.letters().apply { place(0f, 0f, 1080f, 648f) }
-    private val centers = layout.letterCenters()
+    // 1080 px wide at 3x density, like a typical phone: QWERTY has four 54 dp rows.
+    private val layout = Layouts.qwerty().apply { place(0f, 0f, 1080f, 648f) }
+    private val index = dictionary.swipeIndex("qwerty", layout::keyOf)
+    private val centers = layout.swipeCenters()
     private val keyWidth = layout.unitWidth()
+
+    private fun decode(xs: FloatArray, ys: FloatArray) = GestureDecoder.decode(xs, ys, index, centers, keyWidth)
 
     /** A sloppy swipe: each key point wobbles by up to [wobble] key widths, with jitter in between. */
     private fun swipe(word: String, random: Random, wobble: Float = 0.25f): Pair<FloatArray, FloatArray> {
         val xs = ArrayList<Float>()
         val ys = ArrayList<Float>()
-        val keys = Dictionary.Word(word, 0).keys
+        val keys = index.keysFor(word)!!
         val points = keys.map { c ->
             val center = centers.getValue(c)
             floatArrayOf(
@@ -61,7 +63,7 @@ class GestureDecoderTest {
         val misses = ArrayList<String>()
         for (word in words) {
             val (xs, ys) = swipe(word, random)
-            val got = decoder.decode(xs, ys, centers, keyWidth).map { it.lowercase() }
+            val got = decode(xs, ys).map { it.lowercase() }
             if (got.firstOrNull() == word) top1++ else misses += "$word -> ${got.take(3)}"
             if (word in got.take(3)) top3++
         }
@@ -76,7 +78,7 @@ class GestureDecoderTest {
         var top3 = 0
         for (word in words) {
             val (xs, ys) = swipe(word, random, wobble = 0.4f)
-            if (word in decoder.decode(xs, ys, centers, keyWidth).take(3).map { it.lowercase() }) top3++
+            if (word in decode(xs, ys).take(3).map { it.lowercase() }) top3++
         }
         println("sloppy top-3 $top3/${words.size}")
         assertTrue("sloppy top-3 $top3/${words.size}", top3 >= words.size * 0.85)
@@ -85,7 +87,22 @@ class GestureDecoderTest {
     @Test
     fun aTapIsNotASwipe() {
         val c = centers.getValue('g')
-        assertEquals(emptyList<String>(), decoder.decode(floatArrayOf(c[0], c[0] + 2), floatArrayOf(c[1], c[1]), centers, keyWidth))
+        assertEquals(emptyList<String>(), decode(floatArrayOf(c[0], c[0] + 2), floatArrayOf(c[1], c[1])))
+    }
+
+    @Test
+    fun learnedWordsWin() {
+        // A word you type often moves up the suggestions...
+        val usual = dictionary.complete("tho", 3)
+        val rare = dictionary.complete("tho", 50).last()
+        dictionary.find(rare)!!.personal = 250
+        assertEquals(rare, dictionary.complete("tho", 1).first())
+        // ...and a new word (a name) becomes a suggestion and swipeable once learned.
+        dictionary.findOrAdd("Whistleflux").personal = 165
+        assertEquals("Whistleflux", dictionary.complete("whistlef", 1).first())
+        assertTrue(index.candidates('w', 'x').any { it.word.text == "Whistleflux" })
+        dictionary.forgetPersonal()
+        assertEquals(usual, dictionary.complete("tho", 3))
     }
 
     @Test

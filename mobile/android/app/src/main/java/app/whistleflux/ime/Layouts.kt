@@ -1,20 +1,32 @@
 package app.whistleflux.ime
 
 /**
- * Key layouts, modeled on Gboard: QWERTY letters (long-press the top row for digits), two
- * symbol pages, and a number pad for number and phone fields. Pure Kotlin geometry (no
- * Android classes), so the swipe decoder can be tested on the computer.
+ * Key layouts: the mic view (the default), QWERTY, the symbols page, and number and phone
+ * pads. Pure Kotlin geometry (no Android classes), so the swipe decoder can be tested on
+ * the computer.
  */
-enum class KeyType { CHAR, SHIFT, DELETE, ENTER, SPACE, SYMBOLS, LETTERS, MORE_SYMBOLS }
+enum class KeyType {
+    /** Types its text. */
+    CHAR,
+    SHIFT, DELETE, ENTER, SPACE, MIC,
+    /** Open the symbols page. */
+    SYMBOLS,
+    /** Back from the symbols page or number pad to the letters. */
+    LETTERS_PAGE,
+    /** From the mic view to QWERTY. */
+    TO_QWERTY,
+}
 
 class Key(
     val type: KeyType,
-    /** What a CHAR key types (lowercase for letters), or the label of a mode key. */
+    /** What a CHAR key types, or a mode key's label. */
     val text: String = "",
-    /** Width in units of one letter key. */
+    /** Width in units of one key. */
     val width: Float = 1f,
     /** Typed on long-press, and drawn small in the corner. */
     val hint: String? = null,
+    /** Long-press opens these to slide across and pick one (instead of [hint]). */
+    val popup: List<String>? = null,
 ) {
     var left = 0f
     var top = 0f
@@ -25,14 +37,23 @@ class Key(
     val isLetter get() = type == KeyType.CHAR && text.length == 1 && text[0] in 'a'..'z'
     val isFunction get() = type != KeyType.CHAR && type != KeyType.SPACE
 
+    /** Swipe typing starts on these. */
+    val swipeable get() = isLetter
+
     fun contains(x: Float, y: Float) = x >= left && x < right && y >= top && y < bottom
 }
 
-/** One row: keys plus empty space (in key units) before and after, e.g. QWERTY's "asdf" row. */
-class Row(val keys: List<Key>, val inset: Float = 0f)
+/**
+ * One row: keys plus empty space (in key units) before and after, e.g. QWERTY's "asdf" row.
+ * [height] is relative to the layout's other rows (the mic view's mic row is taller).
+ */
+class Row(val keys: List<Key>, val inset: Float = 0f, val height: Float = 1f)
 
-class Layout(val rows: List<Row>, val columns: Float) {
+class Layout(val rows: List<Row>, val columns: Float, val rowHeightDp: Float = 54f, val voice: Boolean = false) {
     val keys get() = rows.flatMap { it.keys }
+
+    /** Height in rows of [rowHeightDp]. */
+    val heightInRows get() = rows.sumOf { it.height.toDouble() }.toFloat()
 
     /**
      * Places the keys in [left, top, right, bottom]. Each key fills its whole cell (gaps
@@ -41,17 +62,20 @@ class Layout(val rows: List<Row>, val columns: Float) {
      */
     fun place(left: Float, top: Float, right: Float, bottom: Float) {
         val unit = (right - left) / columns
-        val rowHeight = (bottom - top) / rows.size
-        rows.forEachIndexed { r, row ->
+        val rowUnit = (bottom - top) / heightInRows
+        var y = top
+        for (row in rows) {
             val used = row.keys.sumOf { it.width.toDouble() }.toFloat() + 2 * row.inset
             var x = left + row.inset * unit + (columns - used) * unit / 2
-            row.keys.forEach { key ->
+            val h = row.height * rowUnit
+            for (key in row.keys) {
                 key.left = x
-                key.top = top + r * rowHeight
+                key.top = y
                 x += key.width * unit
                 key.right = x
-                key.bottom = key.top + rowHeight
+                key.bottom = y + h
             }
+            y += h
         }
     }
 
@@ -63,70 +87,104 @@ class Layout(val rows: List<Row>, val columns: Float) {
             ?: row.keys.minByOrNull { minOf(kotlin.math.abs(it.left - x), kotlin.math.abs(it.right - x)) }
     }
 
-    /** Centers of the letter keys, for the swipe decoder. */
-    fun letterCenters(): Map<Char, FloatArray> =
-        keys.filter { it.isLetter }.associate { it.text[0] to floatArrayOf(it.centerX, it.centerY) }
+    /** For swipe typing: the key each letter is on (on QWERTY, the letter itself). */
+    fun keyOf(letter: Char): Char? = letterKeys[letter]
 
-    /** Width of one letter key in pixels (after [place]). */
-    fun unitWidth(): Float = keys.firstOrNull { it.isLetter }?.let { it.right - it.left } ?: 1f
+    private val letterKeys: Map<Char, Char> by lazy { keys.filter { it.isLetter }.associate { it.text[0] to it.text[0] } }
+
+    /** Centers of the swipeable keys, by the id [keyOf] gives them. */
+    fun swipeCenters(): Map<Char, FloatArray> = keys.filter { it.swipeable }.associate { it.text[0] to floatArrayOf(it.centerX, it.centerY) }
+
+    /** Width of one swipeable key in pixels (after [place]). */
+    fun unitWidth(): Float = keys.firstOrNull { it.swipeable }?.let { it.right - it.left } ?: 1f
 }
 
 object Layouts {
+    /** Long-press "." on QWERTY (Gboard's punctuation popup). */
+    val PERIOD_POPUP = listOf("*", "\"", "'", ":", ";", "!", "?")
+
+    /** Long-press "," on QWERTY. */
+    val COMMA_POPUP = listOf("@", "#", "$", "_", "&", "-", "+", "(", ")", "/")
+
+    /** The symbols key's label: a few of what it opens. */
+    const val SYMBOLS_LABEL = "@#&"
+
     private fun chars(s: String, hints: String? = null) =
         s.mapIndexed { i, c -> Key(KeyType.CHAR, c.toString(), hint = hints?.getOrNull(i)?.toString()) }
 
-    /** [comma] is "," normally, "@" in email fields and "/" in URL fields. */
-    fun letters(comma: String = ","): Layout = Layout(
+    /**
+     * The default view: a big mic (tap it to speak; it grows into the voice pill), and a row
+     * to switch to QWERTY, type a space, delete and press enter.
+     */
+    fun voice(): Layout = Layout(
+        listOf(
+            Row(listOf(Key(KeyType.MIC, width = 10f)), height = 3f),
+            Row(
+                listOf(
+                    Key(KeyType.TO_QWERTY, width = 1.5f),
+                    Key(KeyType.SPACE, width = 5.5f),
+                    Key(KeyType.DELETE, width = 1.5f),
+                    Key(KeyType.ENTER, width = 1.5f),
+                ),
+            ),
+        ),
+        columns = 10f,
+        voice = true,
+    )
+
+    /** QWERTY (the toolbar's keyboard button), with digits on the top row's long-press. */
+    fun qwerty(comma: String = ","): Layout = Layout(
         listOf(
             Row(chars("qwertyuiop", "1234567890")),
             Row(chars("asdfghjkl"), inset = 0.5f),
             Row(listOf(Key(KeyType.SHIFT, width = 1.5f)) + chars("zxcvbnm") + Key(KeyType.DELETE, width = 1.5f)),
-            bottomRow(Key(KeyType.SYMBOLS, "?123", 1.5f), comma, "."),
-        ),
-        columns = 10f,
-    )
-
-    fun symbols(comma: String = ","): Layout = Layout(
-        listOf(
-            Row(chars("1234567890")),
-            Row(chars("@#\$_&-+()/")),
-            Row(listOf(Key(KeyType.MORE_SYMBOLS, "=\\<", 1.5f)) + chars("*\"':;!?") + Key(KeyType.DELETE, width = 1.5f)),
-            bottomRow(Key(KeyType.LETTERS, "ABC", 1.5f), comma, "."),
-        ),
-        columns = 10f,
-    )
-
-    fun moreSymbols(): Layout = Layout(
-        listOf(
-            Row(chars("~`|•√π÷×¶∆")),
-            Row(chars("£¢€¥^°={}\\")),
-            Row(listOf(Key(KeyType.SYMBOLS, "?123", 1.5f)) + chars("%©®™✓[]") + Key(KeyType.DELETE, width = 1.5f)),
-            bottomRow(Key(KeyType.LETTERS, "ABC", 1.5f), "<", ">"),
-        ),
-        columns = 10f,
-    )
-
-    /** Number pad for number fields; [phone] swaps in the dialer's * # and +. */
-    fun numbers(phone: Boolean): Layout = Layout(
-        listOf(
-            Row(chars("123") + Key(KeyType.CHAR, if (phone) "+" else "-")),
-            Row(chars("456") + Key(KeyType.SPACE)),
-            Row(chars("789") + Key(KeyType.DELETE)),
             Row(
-                if (phone) chars("*0#") + Key(KeyType.ENTER)
-                else chars(",0.") + Key(KeyType.ENTER),
+                listOf(
+                    Key(KeyType.SYMBOLS, SYMBOLS_LABEL, width = 1.5f),
+                    Key(KeyType.CHAR, comma, popup = COMMA_POPUP),
+                    Key(KeyType.SPACE, width = 4f),
+                    Key(KeyType.CHAR, ".", popup = PERIOD_POPUP),
+                    Key(KeyType.MIC),
+                    Key(KeyType.ENTER, width = 1.5f),
+                ),
             ),
         ),
-        columns = 4f,
+        columns = 10f,
     )
 
-    private fun bottomRow(mode: Key, comma: String, period: String) = Row(
+    /** The symbols page: the common symbols, in big keys. */
+    fun symbols(): Layout {
+        val fn = 1.2f
+        return Layout(
+            listOf(
+                Row(chars(".,?!'") + Key(KeyType.DELETE, width = fn)),
+                Row(chars("\":;-_") + Key(KeyType.ENTER, width = fn)),
+                Row(chars("@#\$&*") + Key(KeyType.MIC, width = fn)),
+                Row(listOf(Key(KeyType.LETTERS_PAGE, "abc")) + chars("+()/") + Key(KeyType.SPACE, width = fn)),
+            ),
+            columns = 5f + fn,
+        )
+    }
+
+    /** Number pad (the toolbar's number pad button, and number fields), like Gboard's. */
+    fun numbers(): Layout = Layout(
         listOf(
-            mode,
-            Key(KeyType.CHAR, comma),
-            Key(KeyType.SPACE, width = 5f),
-            Key(KeyType.CHAR, period),
-            Key(KeyType.ENTER, width = 1.5f),
+            Row(chars("+123/")),
+            Row(chars("-456") + Key(KeyType.SPACE)),
+            Row(chars("*789") + Key(KeyType.DELETE)),
+            Row(listOf(Key(KeyType.LETTERS_PAGE, "abc")) + chars(",0.") + Key(KeyType.ENTER)),
         ),
+        columns = 5f,
+    )
+
+    /** Dial pad for phone fields. */
+    fun phone(): Layout = Layout(
+        listOf(
+            Row(chars("123") + Key(KeyType.CHAR, "+")),
+            Row(chars("456") + Key(KeyType.SPACE)),
+            Row(chars("789") + Key(KeyType.DELETE)),
+            Row(chars("*0#") + Key(KeyType.ENTER)),
+        ),
+        columns = 4f,
     )
 }

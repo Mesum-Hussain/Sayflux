@@ -9,6 +9,18 @@
     <string name="kb_cancel_hint">Tap anywhere else to cancel</string>
     <string name="kb_trackpad">Move the cursor</string>
     <string name="kb_loading_words">Loading words, try again in a moment</string>
+    <string name="kb_abc">ABC</string>
+    <string name="kb_back_to_keys">Back to the keys</string>
+    <string name="kb_delete">Delete</string>
+    <string name="kb_select_all">Select all</string>
+    <string name="kb_cut">Cut</string>
+    <string name="kb_copy">Copy</string>
+    <string name="kb_paste">Paste</string>
+    <string name="kb_search_emoji">Search emoji</string>
+    <string name="kb_no_emoji">No emoji found</string>
+    <string name="kb_recent_emoji">Recently used</string>
+    <string name="kb_tap_to_speak">Tap to speak</string>
+    <string name="kb_clipboard_empty">Text you copy shows up here for an hour.</string>
     <string name="kb_need_mic">Open Whistleflux to allow the microphone</string>
     <string name="kb_need_model">Open Whistleflux to download the speech model</string>
 </resources>
