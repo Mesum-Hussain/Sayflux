@@ -4,7 +4,7 @@ import json
 import unittest
 from pathlib import Path
 
-from sayflux.cleanup import clean
+from whistleflux.cleanup import clean
 
 CASES = json.loads((Path(__file__).parents[1] / "shared" / "cleanup-cases.json").read_text())["cases"]
 

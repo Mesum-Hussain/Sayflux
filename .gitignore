@@ -15,4 +15,4 @@ dist/
 .ruff_cache/
 
 # Personal scratch
-test
+/test

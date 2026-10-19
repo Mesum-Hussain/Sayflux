@@ -8,6 +8,3 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
-
-# sherpa-onnx calls into these classes from native code.
--keep class com.k2fsa.sherpa.onnx.** { *; }

@@ -1,20 +1,19 @@
 [project]
-name = "sayflux"
+name = "whistleflux"
 version = "0.2.0"
-description = "Dictate anywhere: local Parakeet speech-to-text, cleaned up by Gemini, typed at your cursor."
+description = "Dictate anywhere: local Whistle speech-to-text, cleaned up by Gemini, typed at your cursor."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
-    "sherpa-onnx>=1.12",
     "sounddevice>=0.4",
     # Linux types through /dev/uinput directly; macOS and Windows use pynput.
     "pynput>=1.7; sys_platform != 'linux'",
 ]
 
 [project.scripts]
-sayflux = "sayflux.cli:main"
+whistleflux = "whistleflux.cli:main"
 
 [build-system]
 requires = ["hatchling>=1.27"]

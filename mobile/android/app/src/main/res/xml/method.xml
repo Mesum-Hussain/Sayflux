@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Declares the Sayflux keyboard to Android. The gear in the keyboard list opens the app. -->
+<!-- Declares the Whistleflux keyboard to Android. The gear in the keyboard list opens the app. -->
 <input-method xmlns:android="http://schemas.android.com/apk/res/android"
-    android:settingsActivity="app.sayflux.MainActivity"
+    android:settingsActivity="app.whistleflux.MainActivity"
     android:supportsSwitchingToNextInputMethod="true" />

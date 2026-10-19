@@ -77,14 +77,14 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "app.sayflux"
+    namespace "app.whistleflux"
     defaultConfig {
-        applicationId "app.sayflux"
+        applicationId "app.whistleflux"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "0.1.0"
-        // Only package native code (React Native, sherpa-onnx) for the architectures we build.
+        // Only package native code (React Native, the speech engine) for the architectures we build.
         ndk { abiFilters(*reactNativeArchitectures.split(",")) }
     }
     signingConfigs {
@@ -109,85 +109,137 @@ android {
     }
 }
 
-// sherpa-onnx (runs the speech model). Its Android library is only published on GitHub,
-// so download it once into app/libs/ and check its SHA-256 before using it.
-def sherpaOnnxVersion = "1.13.8"
-def sherpaOnnxSha256 = "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96"
-def sherpaOnnxAar = file("libs/sherpa-onnx-${sherpaOnnxVersion}.aar")
-if (!sherpaOnnxAar.exists()) {
-    def url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v${sherpaOnnxVersion}/sherpa-onnx-${sherpaOnnxVersion}.aar"
+// Downloads url to dest once and checks its SHA-256, so a changed or corrupted file fails the build.
+def fetchVerified = { String url, String sha256, File dest ->
+    if (dest.exists()) return
     logger.lifecycle("Downloading ${url}")
-    sherpaOnnxAar.parentFile.mkdirs()
-    def tmp = file("${sherpaOnnxAar.path}.part")
+    dest.parentFile.mkdirs()
+    def tmp = new File("${dest.path}.part")
     new URL(url).withInputStream { input -> tmp.withOutputStream { it << input } }
-    def digest = java.security.MessageDigest.getInstance("SHA-256").digest(tmp.bytes).encodeHex().toString()
-    if (digest != sherpaOnnxSha256) {
-        tmp.delete()
-        throw new GradleException("sherpa-onnx download has the wrong SHA-256: ${digest}")
+    def md = java.security.MessageDigest.getInstance("SHA-256")
+    tmp.withInputStream { input ->
+        byte[] buf = new byte[1 << 20]
+        int n
+        while ((n = input.read(buf)) > 0) md.update(buf, 0, n)
     }
-    tmp.renameTo(sherpaOnnxAar)
+    def digest = md.digest().encodeHex().toString()
+    if (digest != sha256) {
+        tmp.delete()
+        throw new GradleException("${dest.name} download has the wrong SHA-256: ${digest}")
+    }
+    tmp.renameTo(dest)
 }
 
-// The speech model ships inside the app (assets/models/<name>/), so it works right after
-// install with no download. Fetched once into app/build/, checked against its SHA-256.
-// Same model as the desktop app's default (src/sayflux/speech.py).
-def speechModelName = "sherpa-onnx-nemo-parakeet-redux"
-def speechModelUrl = "https://huggingface.co/Codyfederer/sherpa-onnx-nemo-parakeet-redux/resolve/main/${speechModelName}.tar.bz2"
-def speechModelSha256 = "4f1b06857fa85abab4d7fb14b644a6a98f2e241d92f9e5227f6719e0050417c4"
-def speechModelFiles = ["encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt"]
+// Cactus's Needle engine runs the speech model. Its Android build is a static library and
+// header (arm64 only), downloaded once into app/libs/ from a pinned commit and linked into
+// libwhistleflux_speech.so by src/main/cpp/CMakeLists.txt.
+def needleRepo = "https://huggingface.co/Cactus-Compute/needle3/resolve/3391a1007e7db31d2fe5c69c734bbe93a9c1ce79"
+def needleDir = file("libs/needle-3.3.2/android-arm64")
+fetchVerified("${needleRepo}/android-arm64/libneedle.a",
+        "f862e2d58fbf4229c58678c492f73721d64ae4fdee023b91db155f04decae3f1", new File(needleDir, "libneedle.a"))
+fetchVerified("${needleRepo}/android-arm64/needle.h",
+        "a27dac4b3239eead91d124b7f7dbce5495c13019903fd817b68c16d39b055a99", new File(needleDir, "needle.h"))
+
+android {
+    externalNativeBuild {
+        cmake { path "src/main/cpp/CMakeLists.txt" }
+    }
+    defaultConfig {
+        externalNativeBuild {
+            cmake { arguments "-DNEEDLE_DIR=${needleDir.absolutePath}", "-DANDROID_STL=c++_shared" }
+        }
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+}
+
+// The speech model ships inside the app (assets/models/whistle.cact, 17 MB), so it works
+// right after install with no download. Same model as the desktop app (src/whistleflux/speech.py).
+def speechModelUrl = "https://huggingface.co/Cactus-Compute/whistle/resolve/741118687e1f008f06d1351a402a731274789790/whistle.cact"
+def speechModelSha256 = "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
 def speechModelAssets = layout.buildDirectory.dir("generated/speechModel/assets").get().asFile
 
 def prepareSpeechModel = tasks.register("prepareSpeechModel") {
-    description = "Downloads the Parakeet Redux speech model and unpacks it into the app's assets."
-    def archive = file("${rootDir}/.speech-model/${speechModelName}.tar.bz2")
-    def outDir = new File(speechModelAssets, "models/${speechModelName}")
+    description = "Downloads the Whistle speech model into the app's assets."
+    def cached = file("${rootDir}/.speech-model/whistle-${speechModelSha256.take(12)}.cact")
     outputs.dir(speechModelAssets)
     inputs.property("sha256", speechModelSha256)
     doLast {
-        if (!archive.exists()) {
-            logger.lifecycle("Downloading ${speechModelUrl}")
-            archive.parentFile.mkdirs()
-            def tmp = file("${archive.path}.part")
-            new URL(speechModelUrl).withInputStream { input -> tmp.withOutputStream { it << input } }
-            tmp.renameTo(archive)
-        }
-        def md = java.security.MessageDigest.getInstance("SHA-256")
-        archive.withInputStream { input ->
-            byte[] buf = new byte[1 << 20]
-            int n
-            while ((n = input.read(buf)) > 0) md.update(buf, 0, n)
-        }
-        def digest = md.digest().encodeHex().toString()
-        if (digest != speechModelSha256) {
-            archive.delete()
-            throw new GradleException("Speech model download has the wrong SHA-256: ${digest}")
-        }
+        fetchVerified(speechModelUrl, speechModelSha256, cached)
         delete(speechModelAssets)
-        def staging = file("${temporaryDir}/unpacked")
-        delete(staging)
-        ant.untar(src: archive, dest: staging, compression: "bzip2")
-        outDir.mkdirs()
-        speechModelFiles.each { name ->
-            def f = new File(staging, "${speechModelName}/${name}")
-            if (!f.exists()) throw new GradleException("Speech model archive is missing ${name}")
-            f.renameTo(new File(outDir, name))
+        copy {
+            from(cached)
+            into(new File(speechModelAssets, "models"))
+            rename { "whistle.cact" }
         }
-        delete(staging)
     }
 }
 
 android.sourceSets.main.assets.srcDir(speechModelAssets)
-// Keep the model uncompressed in the APK so it can be read directly, without unpacking.
-android.androidResources.noCompress += ["onnx"]
 tasks.named("preBuild") { dependsOn(prepareSpeechModel) }
+
+// English word list for the keyboard's suggestions and swipe typing: AOSP's keyboard
+// dictionary (Apache 2.0), pinned to a commit and checked against its SHA-256. Kept: plain
+// words (letters and apostrophes) with frequency 20 or more, minus anything AOSP marks
+// offensive. Written as "word<TAB>frequency" lines, most frequent first.
+def dictionaryCommit = "127336e9f29d69607eab55982324b210279ae8c5"
+def dictionaryUrl = "https://android.googlesource.com/platform/packages/inputmethods/LatinIME/+/${dictionaryCommit}/dictionaries/en_US_wordlist.combined.gz?format=TEXT"
+def dictionarySha256 = "0f78dd455b532be169a23f233227b811fabced4b5bd7fc9c40cc05839793bcbd"
+def dictionaryAssets = layout.buildDirectory.dir("generated/dictionary/assets").get().asFile
+
+def prepareDictionary = tasks.register("prepareDictionary") {
+    description = "Downloads AOSP's English word list and writes the keyboard's word file."
+    def cached = file("${rootDir}/.speech-model/en_US_wordlist-${dictionarySha256.take(12)}.gz")
+    outputs.dir(dictionaryAssets)
+    inputs.property("sha256", dictionarySha256)
+    doLast {
+        if (!cached.exists()) {
+            logger.lifecycle("Downloading ${dictionaryUrl}")
+            // Gitiles serves raw files base64-encoded.
+            def bytes = java.util.Base64.mimeDecoder.decode(new URL(dictionaryUrl).text.trim())
+            def digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).encodeHex().toString()
+            if (digest != dictionarySha256) {
+                throw new GradleException("Word list download has the wrong SHA-256: ${digest}")
+            }
+            cached.parentFile.mkdirs()
+            cached.bytes = bytes
+        }
+        def words = []
+        def line = ~/^ word=([^,]+),f=(\d+),flags=([^,]*)(.*)$/
+        new java.util.zip.GZIPInputStream(new FileInputStream(cached)).withReader("UTF-8") { reader ->
+            reader.eachLine { s ->
+                def m = s =~ line
+                if (!m.matches()) return
+                def word = m.group(1)
+                def freq = m.group(2) as int
+                def flags = m.group(3)
+                if (m.group(4).contains("possibly_offensive=true") || flags in ["offensive", "nonword"]) return
+                if (freq < 20 || !(word ==~ /[A-Za-z][A-Za-z']*/)) return
+                words << [word, freq]
+            }
+        }
+        words.sort { a, b -> b[1] <=> a[1] }
+        delete(dictionaryAssets)
+        def out = new File(dictionaryAssets, "dictionaries/en_words.txt")
+        out.parentFile.mkdirs()
+        out.withWriter("UTF-8") { w -> words.each { w.write("${it[0]}\t${it[1]}\n") } }
+        logger.lifecycle("Wrote ${words.size()} words to ${out}")
+    }
+}
+
+android.sourceSets.main.assets.srcDir(dictionaryAssets)
+tasks.named("preBuild") { dependsOn(prepareDictionary) }
+// GestureDecoderTest reads the generated word file.
+tasks.withType(Test).configureEach { dependsOn(prepareDictionary) }
 
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-    implementation(files(sherpaOnnxAar))
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814") // Android's own org.json is a stub in unit tests
+    // On-phone test of the speech engine (see the README: connectedAndroidTest would uninstall the app)
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

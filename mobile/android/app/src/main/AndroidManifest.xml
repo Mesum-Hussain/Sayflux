@@ -25,9 +25,9 @@
         </intent-filter>
       </activity>
 
-      <!-- The Sayflux keyboard. Users turn it on in Android's keyboard settings. -->
+      <!-- The Whistleflux keyboard. Users turn it on in Android's keyboard settings. -->
       <service
-        android:name=".ime.SayfluxKeyboard"
+        android:name=".ime.WhistlefluxKeyboard"
         android:label="@string/keyboard_name"
         android:permission="android.permission.BIND_INPUT_METHOD"
         android:exported="true">

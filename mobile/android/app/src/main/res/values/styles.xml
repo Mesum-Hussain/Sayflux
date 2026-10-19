@@ -6,17 +6,4 @@
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
     </style>
 
-    <!-- A key in the Sayflux keyboard's bottom row. -->
-    <style name="KbKey">
-        <item name="android:layout_height">match_parent</item>
-        <item name="android:layout_marginStart">3dp</item>
-        <item name="android:layout_marginEnd">3dp</item>
-        <item name="android:background">@drawable/kb_key_bg</item>
-        <item name="android:padding">13dp</item>
-        <item name="android:scaleType">fitCenter</item>
-        <item name="android:tint">@color/kb_icon</item>
-        <item name="android:clickable">true</item>
-        <item name="android:focusable">true</item>
-    </style>
-
 </resources>

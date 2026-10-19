@@ -1,5 +1,5 @@
 {
-  "name": "sayflux-mobile",
+  "name": "whistleflux-mobile",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -38,11 +38,11 @@
     "node": ">= 22.11.0"
   },
   "codegenConfig": {
-    "name": "SayfluxSpec",
+    "name": "WhistlefluxSpec",
     "type": "modules",
     "jsSrcsDir": "specs",
     "android": {
-      "javaPackageName": "app.sayflux.specs"
+      "javaPackageName": "app.whistleflux.specs"
     }
   }
 }

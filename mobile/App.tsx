@@ -1,7 +1,7 @@
 /**
- * Sayflux setup screen: walks through the one-time setup (microphone, keyboard), holds
+ * Whistleflux setup screen: walks through the one-time setup (microphone, keyboard), holds
  * the clean-up settings, and has a text box to try the keyboard in. The dictation itself
- * happens in the native keyboard (android/.../ime/SayfluxKeyboard.kt). Speech is turned
+ * happens in the native keyboard (android/.../ime/WhistlefluxKeyboard.kt). Speech is turned
  * into text on the phone (the model ships with the app); only the text is sent to Gemini
  * for the optional smart clean-up.
  *
@@ -11,7 +11,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   AppState,
+  Image,
   Linking,
+  Modal,
   PermissionsAndroid,
   Pressable,
   ScrollView,
@@ -27,7 +29,11 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import Sayflux, { type Settings, type Status } from './specs/NativeSayflux';
+import Whistleflux, {
+  type ModelOption,
+  type Settings,
+  type Status,
+} from './specs/NativeWhistleflux';
 
 type Palette = typeof light;
 
@@ -58,7 +64,7 @@ const dark: Palette = {
 function useStatus() {
   const [status, setStatus] = useState<Status | null>(null);
   const refresh = useCallback(() => {
-    Sayflux.getStatus()
+    Whistleflux.getStatus()
       .then(setStatus)
       .catch(() => {});
   }, []);
@@ -137,7 +143,14 @@ function SetupScreen({ c }: { c: Palette }) {
       ]}
       keyboardShouldPersistTaps="handled"
     >
-      <Text style={s.title}>Sayflux</Text>
+      <View style={s.brand}>
+        <Image
+          source={require('./assets/logo.png')}
+          style={s.logo}
+          accessibilityIgnoresInvertColors
+        />
+        <Text style={s.title}>Whistleflux</Text>
+      </View>
       <Text style={s.subtitle}>
         Speak instead of typing, in any app. Your voice is turned into text on
         your phone and never leaves it.
@@ -149,7 +162,7 @@ function SetupScreen({ c }: { c: Palette }) {
         done={status.micGranted}
         active={current === 0}
         title="Allow the microphone"
-        body="Sayflux only listens after you tap the mic on its keyboard, until you tap it again."
+        body="Whistleflux only listens after you tap the mic on its keyboard, until you tap it again."
       >
         <Button c={c} label="Allow microphone" onPress={requestMic} />
       </Step>
@@ -159,13 +172,13 @@ function SetupScreen({ c }: { c: Palette }) {
         n={2}
         done={status.keyboardEnabled}
         active={current === 1}
-        title="Turn on the Sayflux keyboard"
-        body="In the list that opens, switch on Sayflux. Android warns that a keyboard can see what you type; Sayflux only types text you dictate and stores none of it."
+        title="Turn on the Whistleflux keyboard"
+        body="In the list that opens, switch on Whistleflux. Android warns that a keyboard can see what you type; Whistleflux only types text you dictate and stores none of it."
       >
         <Button
           c={c}
           label="Open keyboard settings"
-          onPress={() => Sayflux.openKeyboardSettings()}
+          onPress={() => Whistleflux.openKeyboardSettings()}
         />
       </Step>
 
@@ -174,13 +187,13 @@ function SetupScreen({ c }: { c: Palette }) {
         n={3}
         done={status.keyboardSelected}
         active={current === 2}
-        title="Switch to Sayflux"
-        body="Pick Sayflux as your keyboard. Its keyboard button switches back to your usual one whenever you want to type."
+        title="Switch to Whistleflux"
+        body="Pick Whistleflux as your keyboard. Type or swipe as usual, and tap the mic at the top right to speak."
       >
         <Button
           c={c}
           label="Choose keyboard"
-          onPress={() => Sayflux.showKeyboardPicker()}
+          onPress={() => Whistleflux.showKeyboardPicker()}
         />
       </Step>
 
@@ -241,8 +254,8 @@ function TryIt({ c }: { c: Palette }) {
     <View style={s.card}>
       <Text style={s.sectionTitle}>Try it</Text>
       <Text style={s.body}>
-        Tap the box, then tap the mic on the Sayflux keyboard. Tap again when
-        you're done speaking.
+        Tap the box, then tap the mic at the top right of the keyboard. Tap the
+        pill when you're done speaking, or anywhere else to cancel.
       </Text>
       <TextInput
         style={[s.input, s.multiline]}
@@ -259,7 +272,7 @@ function TryIt({ c }: { c: Palette }) {
 function CleanupSettings({ c }: { c: Palette }) {
   const s = makeStyles(c);
   const [settings, setSettings] = useState<Settings>(() =>
-    Sayflux.getSettings(),
+    Whistleflux.getSettings(),
   );
   const [saved, setSaved] = useState(true);
 
@@ -267,20 +280,16 @@ function CleanupSettings({ c }: { c: Palette }) {
     const next = { ...settings, ...patch };
     setSettings(next);
     if (saveNow) {
-      Sayflux.saveSettings(next);
+      Whistleflux.saveSettings(next);
     } else {
       setSaved(false);
     }
   };
 
   const save = () => {
-    const next = {
-      ...settings,
-      apiKey: settings.apiKey.trim(),
-      model: settings.model.trim(),
-    };
+    const next = { ...settings, apiKey: settings.apiKey.trim() };
     setSettings(next);
-    Sayflux.saveSettings(next);
+    Whistleflux.saveSettings(next);
     setSaved(true);
   };
 
@@ -337,13 +346,15 @@ function CleanupSettings({ c }: { c: Palette }) {
       </Pressable>
 
       <Text style={[s.label, s.gapTop]}>Model</Text>
-      <TextInput
-        style={s.input}
+      <ModelPicker
+        c={c}
         value={settings.model}
-        onChangeText={v => update({ model: v })}
-        autoCapitalize="none"
-        autoCorrect={false}
+        onChange={id => update({ model: id }, true)}
       />
+      <Text style={s.hint}>
+        If this model is out of free uses for the day, a Flash-Lite model is
+        used instead.
+      </Text>
 
       <Text style={[s.label, s.gapTop]}>Extra instructions (optional)</Text>
       <TextInput
@@ -351,7 +362,7 @@ function CleanupSettings({ c }: { c: Palette }) {
         value={settings.instructions}
         onChangeText={v => update({ instructions: v })}
         multiline
-        placeholder="Names and words to spell correctly, e.g. Mesum, Sayflux"
+        placeholder="Names and words to spell correctly, e.g. Mesum, Whistleflux"
         placeholderTextColor={c.muted}
       />
       <Button
@@ -361,6 +372,70 @@ function CleanupSettings({ c }: { c: Palette }) {
         onPress={save}
       />
     </View>
+  );
+}
+
+function ModelPicker({
+  c,
+  value,
+  onChange,
+}: {
+  c: Palette;
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const s = makeStyles(c);
+  const [models] = useState<ModelOption[]>(() => Whistleflux.getModels());
+  const [open, setOpen] = useState(false);
+  const current = models.find(m => m.id === value) ?? models[0];
+
+  return (
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        testID="model-picker"
+        accessibilityRole="button"
+        accessibilityLabel={`Model: ${current?.label}. Tap to change.`}
+        style={({ pressed }) => [s.input, s.picker, pressed && s.pressed]}
+      >
+        <View style={s.switchText}>
+          <Text style={s.pickerLabel}>{current?.label}</Text>
+          <Text style={s.hint}>{current?.note}</Text>
+        </View>
+        <Text style={s.pickerArrow}>▾</Text>
+      </Pressable>
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
+        <Pressable style={s.backdrop} onPress={() => setOpen(false)}>
+          <View style={s.sheet}>
+            <Text style={s.sectionTitle}>Choose a model</Text>
+            {models.map(m => (
+              <Pressable
+                key={m.id}
+                testID={`model-${m.id}`}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: m.id === current?.id }}
+                onPress={() => {
+                  onChange(m.id);
+                  setOpen(false);
+                }}
+                style={({ pressed }) => [s.option, pressed && s.pressed]}
+              >
+                <View style={s.switchText}>
+                  <Text style={s.pickerLabel}>{m.label}</Text>
+                  <Text style={s.hint}>{m.note}</Text>
+                </View>
+                {m.id === current?.id && <Text style={s.check}>✓</Text>}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 
@@ -406,6 +481,8 @@ function buildStyles(c: Palette) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.bg },
     content: { paddingHorizontal: 16 },
+    brand: { flexDirection: 'row', alignItems: 'center' },
+    logo: { width: 48, height: 48, marginRight: 10 },
     title: { fontSize: 32, fontWeight: '700', color: c.text },
     subtitle: {
       fontSize: 16,
@@ -466,6 +543,24 @@ function buildStyles(c: Palette) {
       marginBottom: 4,
     },
     multiline: { minHeight: 96, textAlignVertical: 'top', marginBottom: 12 },
+    picker: { flexDirection: 'row', alignItems: 'center' },
+    pickerLabel: { fontSize: 16, color: c.text },
+    pickerArrow: { fontSize: 18, color: c.muted },
+    backdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+    },
+    sheet: { backgroundColor: c.card, borderRadius: 16, padding: 16 },
+    option: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+    },
+    check: { fontSize: 18, fontWeight: '700', color: c.accent },
     button: {
       backgroundColor: c.accent,
       borderRadius: 12,

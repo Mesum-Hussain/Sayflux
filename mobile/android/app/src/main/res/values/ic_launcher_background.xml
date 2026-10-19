@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Background of the Whistleflux mark (whistleflux-mark.svg). -->
+    <color name="ic_launcher_background">#101418</color>
+</resources>
